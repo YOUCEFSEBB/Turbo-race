@@ -66,10 +66,43 @@ button{cursor:pointer}.mode,.upgrade{border:0;border-radius:14px;padding:13px;co
 <div class="card"><div class="ad">📺 مكان إعلان Mini App — سنربطه لاحقًا بمزود الإعلانات</div></div>
 </div>
 
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
+const SUPABASE_FUNCTION_URL="https://mtcwhbemwlnmfophlxfm.supabase.co/functions/v1/bright-processor";
+const tg=window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();}
+
 const state=JSON.parse(localStorage.getItem("turboRace")||'{"coins":100,"mult":1}');
+let telegramPlayer=null;
 let mode="1v1", running=false, pos=50, timer, score=0;
 const $=id=>document.getElementById(id);
+
+async function connectTelegram(){
+  if(!tg || !tg.initData){
+    $("status").textContent="ℹ️ افتح اللعبة من بوت Telegram لتسجيل الدخول";
+    return;
+  }
+  try{
+    $("status").textContent="🔄 جارٍ تسجيل الدخول...";
+    const res=await fetch(SUPABASE_FUNCTION_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({initData:tg.initData})
+    });
+    const data=await res.json();
+    if(!res.ok || !data.ok) throw new Error(data.error||"تعذر تسجيل الدخول");
+    telegramPlayer=data.player;
+    state.coins=Number(data.player.coins);
+    state.mult=Number(data.player.multiplier);
+    localStorage.setItem("turboRace",JSON.stringify(state));
+    render();
+    $("status").textContent=`👋 أهلاً ${data.player.first_name||"بالسائق"}`;
+  }catch(err){
+    console.error(err);
+    $("status").textContent="❌ تعذر الاتصال بالخادم";
+  }
+}
+
 function save(){localStorage.setItem("turboRace",JSON.stringify(state));render()}
 function render(){$("coins").textContent=Math.floor(state.coins);$("mult").textContent=state.mult.toFixed(2)}
 function setMode(m){
@@ -79,9 +112,11 @@ function setMode(m){
  $("status").textContent=m==="1v1"?"منافس واحد — اضغط ابدأ":"تجاوز السيارات دون الاصطدام";
 }
 $("one").onclick=()=>setMode("1v1"); $("traffic").onclick=()=>setMode("traffic");
+
 function move(d){pos=Math.max(8,Math.min(92,pos+d));$("player").style.left=pos+"%"}
 $("left").onclick=()=>move(-8); $("right").onclick=()=>move(8);
 document.addEventListener("keydown",e=>{if(e.key==="ArrowLeft")move(-8);if(e.key==="ArrowRight")move(8);if(e.code==="Space")start()});
+
 function start(){
  if(running)return; running=true; score=0; $("status").textContent="🚦 انطلق!";
  let enemies=[...document.querySelectorAll(".enemy")];
@@ -105,21 +140,26 @@ function start(){
  }
  timer=requestAnimationFrame(loop)
 }
+
 function finish(win){
  running=false;cancelAnimationFrame(timer);
  if(win){let reward=Math.round((mode==="1v1"?25:40)*state.mult);state.coins+=reward;$("status").textContent="🏆 فوز! +"+reward+" 🪙"}
  else $("status").textContent="💥 اصطدمت! حاول مرة أخرى";
  save()
 }
+
 $("start").onclick=start;
 $("go").onclick=start;
+
 document.querySelectorAll(".upgrade").forEach(b=>b.onclick=()=>{
  const cost=+b.dataset.cost, add=+b.dataset.add;
  if(state.coins<cost){$("status").textContent="❌ العملات غير كافية";return}
  state.coins-=cost;state.mult+=add;$("status").textContent="✅ تمت الترقية";
  save()
 });
+
 setMode("1v1");render();
+connectTelegram();
 </script>
 </body>
 </html>
