@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Turbo Race</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#08111f;color:#fff;font-family:Arial,sans-serif;overflow-x:hidden}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.logo{font-size:23px;font-weight:900}.stats{display:flex;gap:7px}.pill{background:#12233a;border:1px solid #263d5b;border-radius:14px;padding:7px 10px;font-size:13px}
+.card{background:#0e1b2d;border:1px solid #1e3551;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 8px 25px #0004}
+.track{height:390px;border-radius:16px;position:relative;overflow:hidden;background:#30343a;border:3px solid #20262c}
+.road{position:absolute;inset:0;background:repeating-linear-gradient(90deg,#30343a 0 31%,#4a4f55 31% 32%,#30343a 32% 64%,#4a4f55 64% 65%,#30343a 65% 100%)}
+.road:after{content:"";position:absolute;left:50%;top:-20px;width:7px;height:450px;transform:translateX(-50%);background:repeating-linear-gradient(#fff0 0 28px,#fff 28px 52px,#fff0 52px 82px);opacity:.8}
+.car{position:absolute;width:54px;height:78px;border-radius:14px;display:grid;place-items:center;font-size:34px;z-index:3;transition:transform .08s}
+.player{bottom:22px;left:50%;transform:translateX(-50%)}.enemy{top:55px}.e1{left:20%}.e2{left:55%}.e3{left:78%}
+.controls{display:flex;gap:10px;margin-top:10px}.control{flex:1;padding:14px;border:0;border-radius:14px;background:#162d48;color:white;font-size:23px;font-weight:bold}
+h3{margin:5px 0 12px}.modes{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+button{cursor:pointer}.mode,.upgrade{border:0;border-radius:14px;padding:13px;color:#fff;background:#173858;font-weight:bold}
+.mode.active{background:#1f7a55}.upgrades{display:grid;grid-template-columns:1fr 1fr;gap:9px}.upgrade small{display:block;opacity:.7;margin-top:5px}
+.ad{height:64px;display:grid;place-items:center;border:1px dashed #55708f;border-radius:13px;color:#9fb2c8;font-size:13px;background:#0a1625}
+.status{text-align:center;color:#b9c9db;min-height:22px;margin:8px 0}
+.primary{width:100%;border:0;border-radius:14px;padding:14px;background:#ffb000;color:#151515;font-size:17px;font-weight:900}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div class="logo">🏁 Turbo Race</div><div class="stats"><div class="pill">🪙 <span id="coins">100</span></div><div class="pill">⚡ <span id="mult">1.00</span>x</div></div></header>
+
+<div class="card">
+  <h3>اختر نمط السباق</h3>
+  <div class="modes">
+    <button class="mode active" id="one">🏎️ 1 ضد 1</button>
+    <button class="mode" id="traffic">🚗 تجاوز السيارات</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="track" id="track">
+    <div class="road"></div>
+    <div class="car enemy e1">🚙</div>
+    <div class="car enemy e2">🚕</div>
+    <div class="car enemy e3">🚗</div>
+    <div class="car player" id="player">🏎️</div>
+  </div>
+  <div class="controls">
+    <button class="control" id="left">◀</button>
+    <button class="control" id="go">🏁</button>
+    <button class="control" id="right">▶</button>
+  </div>
+  <div class="status" id="status">جاهز للسباق</div>
+  <button class="primary" id="start">ابدأ السباق</button>
+</div>
+
+<div class="card">
+  <h3>🔧 تطوير السيارة</h3>
+  <div class="upgrades">
+    <button class="upgrade" data-cost="50" data-add=".10">🔧 المحرك<small>50 🪙 • +0.10x</small></button>
+    <button class="upgrade" data-cost="75" data-add=".10">⚡ التيربو<small>75 🪙 • +0.10x</small></button>
+    <button class="upgrade" data-cost="60" data-add=".05">🛞 الإطارات<small>60 🪙 • +0.05x</small></button>
+    <button class="upgrade" data-cost="80" data-add=".05">🛑 الفرامل<small>80 🪙 • +0.05x</small></button>
+  </div>
+</div>
+
+<div class="card"><div class="ad">📺 مكان إعلان Mini App — سنربطه لاحقًا بمزود الإعلانات</div></div>
+</div>
+
+<script>
+const state=JSON.parse(localStorage.getItem("turboRace")||'{"coins":100,"mult":1}');
+let mode="1v1", running=false, pos=50, timer, score=0;
+const $=id=>document.getElementById(id);
+function save(){localStorage.setItem("turboRace",JSON.stringify(state));render()}
+function render(){$("coins").textContent=Math.floor(state.coins);$("mult").textContent=state.mult.toFixed(2)}
+function setMode(m){
+ mode=m; document.querySelectorAll(".mode").forEach(x=>x.classList.remove("active"));
+ (m==="1v1"?$("one"):$("traffic")).classList.add("active");
+ document.querySelectorAll(".enemy").forEach((e,i)=>e.style.display=(m==="1v1"&&i>0)?"none":"grid");
+ $("status").textContent=m==="1v1"?"منافس واحد — اضغط ابدأ":"تجاوز السيارات دون الاصطدام";
+}
+$("one").onclick=()=>setMode("1v1"); $("traffic").onclick=()=>setMode("traffic");
+function move(d){pos=Math.max(8,Math.min(92,pos+d));$("player").style.left=pos+"%"}
+$("left").onclick=()=>move(-8); $("right").onclick=()=>move(8);
+document.addEventListener("keydown",e=>{if(e.key==="ArrowLeft")move(-8);if(e.key==="ArrowRight")move(8);if(e.code==="Space")start()});
+function start(){
+ if(running)return; running=true; score=0; $("status").textContent="🚦 انطلق!";
+ let enemies=[...document.querySelectorAll(".enemy")];
+ let ys=[-20, -130, -240], lanes=[20,55,78];
+ if(mode==="1v1"){ys[0]=-80; lanes[0]=50; enemies.forEach((e,i)=>{if(i===0){e.style.display="grid";e.style.left="50%"}else e.style.display="none"})}
+ else enemies.forEach((e,i)=>{e.style.display="grid";e.style.left=lanes[i]+"%"});
+ let last=performance.now();
+ function loop(now){
+   if(!running)return;
+   let dt=Math.min(40,now-last);last=now;
+   enemies.forEach((e,i)=>{
+     if(e.style.display==="none")return;
+     ys[i]+=dt*(0.11+(mode==="traffic"?0.035*i:0));
+     if(ys[i]>410){ys[i]=-70-Math.random()*120; if(mode==="traffic")e.style.left=(10+Math.random()*80)+"%"; score++}
+     e.style.top=ys[i]+"px";
+     const er=e.getBoundingClientRect(), pr=$("player").getBoundingClientRect();
+     if(!(er.right<pr.left+8||er.left>pr.right-8||er.bottom<pr.top+8||er.top>pr.bottom-8)){finish(false);return}
+   });
+   if(score>= (mode==="1v1"?3:8)){finish(true);return}
+   timer=requestAnimationFrame(loop)
+ }
+ timer=requestAnimationFrame(loop)
+}
+function finish(win){
+ running=false;cancelAnimationFrame(timer);
+ if(win){let reward=Math.round((mode==="1v1"?25:40)*state.mult);state.coins+=reward;$("status").textContent="🏆 فوز! +"+reward+" 🪙"}
+ else $("status").textContent="💥 اصطدمت! حاول مرة أخرى";
+ save()
+}
+$("start").onclick=start;
+$("go").onclick=start;
+document.querySelectorAll(".upgrade").forEach(b=>b.onclick=()=>{
+ const cost=+b.dataset.cost, add=+b.dataset.add;
+ if(state.coins<cost){$("status").textContent="❌ العملات غير كافية";return}
+ state.coins-=cost;state.mult+=add;$("status").textContent="✅ تمت الترقية";
+ save()
+});
+setMode("1v1");render();
+</script>
+</body>
+</html>
